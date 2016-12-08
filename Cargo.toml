@@ -1,0 +1,17 @@
+[package]
+name = "merkle_tree"
+version = "0.0.1"
+authors = ["Anton Kaliaev <anton.kalyaev@gmail.com>"]
+repository = ""
+homepage = ""
+license = "MIT"
+readme = "README.md"
+documentation = ""
+description = "Merkle Tree implementation"
+
+[dependencies]
+clippy = {version = "*", optional = true}
+
+[features]
+default = []
+dev=["clippy"]
