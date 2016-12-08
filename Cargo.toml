@@ -11,6 +11,7 @@ description = "Merkle Tree implementation"
 
 [dependencies]
 clippy = {version = "*", optional = true}
+rust-crypto = "^0.2"
 
 [features]
 default = []
