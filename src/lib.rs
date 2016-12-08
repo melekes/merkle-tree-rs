@@ -16,17 +16,12 @@ extern crate crypto;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 
-const LEAF_SIG_TYPE: u8 = 0u8;
-const INTERNAL_SIG_TYPE: u8 = 1u8;
+const LEAF_SIG: u8 = 0u8;
+const INTERNAL_SIG: u8 = 1u8;
 
-enum NodeType {
-    Leaf,
-    Internal
-}
-
+#[derive(Debug)]
 struct Node {
-    hash: *const [u8],
-    _type: NodeType,
+    hash: Vec<u8>,
     left: Option<Box<Node>>,
     right: Option<Box<Node>>,
 }
@@ -34,52 +29,114 @@ struct Node {
 pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
     root: Node,
-    leaves: Vec<Node>,
+    // we need to store read-only links to leafs in order to implement contains API
+    // leaves: &'a [&'a Node<'a>],
 }
 
-fn build_from_leaves(leaves: &Vec<Node>) -> Node {
-    // let mut iter = leaves.iter().take(2);
-    // for chunk in leaves.chunks(2) {
-    //     if chunk.size() == 2 {
-    //         chunk[0]
-    //     } else {
+fn build_leaf_node<H>(block: &[u8], hasher: &mut H) -> Node
+    where H: Digest
+{
+    let mut block_hash = vec![0u8; hasher.output_bits() / 8];
 
-    //     }
+    hasher.reset();
+    hasher.input(block);
+    hasher.result(block_hash.as_mut_slice());
 
+    let mut result = vec![0u8; hasher.output_bits() / 8];
 
-    // }
-    Node { hash: &[0u8], _type: NodeType::Internal, left: None, right: None }
+    hasher.reset();
+    hasher.input(&[LEAF_SIG]);
+    hasher.input(block_hash.as_slice());
+    hasher.result(result.as_mut_slice());
+
+    Node { hash: result, left: None, right: None }
+}
+
+fn build_internal_node_with_one_child<H>(child: Node, hasher: &mut H) -> Node
+    where H: Digest
+{
+    let mut result = vec![0u8; hasher.output_bits() / 8];
+
+    hasher.reset();
+    hasher.input(&[INTERNAL_SIG]);
+    hasher.input(child.hash.as_slice());
+    hasher.result(result.as_mut_slice());
+
+    Node { hash: result, left: Some(Box::new(child)), right: None }
+}
+
+fn build_internal_node<H>(child1: Node, child2: Node, hasher: &mut H) -> Node
+    where H: Digest
+{
+    let mut result = Vec::<u8>::with_capacity(hasher.output_bits() / 8);
+
+    hasher.reset();
+    hasher.input(&[INTERNAL_SIG]);
+    hasher.input(child1.hash.as_slice());
+    hasher.input(child2.hash.as_slice());
+    hasher.result(result.as_mut_slice());
+
+    Node { hash: result, left: Some(Box::new(child1)), right: Some(Box::new(child2)) }
+}
+
+fn build_upper_level<H>(nodes: &mut Vec<Node>, hasher: &mut H) -> Vec<Node>
+    where H: Digest
+{
+    // 7 / 2 = 3. We could have applied ceil here, but adding `1` is much easier
+    let mut row = Vec::with_capacity((nodes.len() + 1) / 2);
+    while nodes.len() > 0 {
+        if nodes.len() > 1 {
+            row.push(build_internal_node(nodes.remove(0), nodes.remove(1), hasher));
+        } else {
+            row.push(build_internal_node_with_one_child(nodes.remove(0), hasher));
+        }
+    }
+    row
+}
+
+fn build_from_leaves<H>(mut leaves: Vec<Node>, hasher: &mut H) -> Node
+    where H: Digest
+{
+    let mut parents = build_upper_level(&mut leaves, hasher);
+
+    while parents.len() > 1 {
+        parents = build_upper_level(&mut parents, hasher);
+    }
+
+    parents.remove(0)
 }
 
 impl<H> MerkleTree<H>
 {
-    /// Constructs a tree from the leaves. Primary usage would be to compute hashes of data blocks (or
-    /// files) and pass them as `raw_leaves`.
+    /// Constructs a tree from blocks of data. Data could be anything as long as it could be
+    /// represented as bytes array.
     ///
     /// # Examples
     ///
     /// ```
     /// use merkle_tree::MerkleTree;
     ///
-    /// let t: MerkleTree = MerkleTree::from_leaves(&[&[1u8]]);
+    /// let block = "Hello World".as_bytes();
+    /// let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block]);
     /// ```
-    pub fn from_leaves(raw_leaves: &[&[u8]]) -> MerkleTree<H>
+    pub fn build_from_blocks(blocks: &[&[u8]]) -> MerkleTree<H>
         where H: Digest + Default
     {
-        let leaves: Vec<Node> = raw_leaves.iter().map(|l| Node { hash: *l, _type: NodeType::Leaf, left: None, right: None }).collect();
+        let mut hasher = Default::default();
+        let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
         MerkleTree {
-            hasher: Default::default(),
-            root: build_from_leaves(&leaves),
-            leaves: leaves
+            // leaves: leaves.iter().map(|l| &l).collect(),
+            root: build_from_leaves(leaves, &mut hasher),
+            hasher: hasher
         }
     }
 
     /// Hasher could be any object, which implements `crypto::digest::Digest` trait. You could
-    /// write your own hasher if you want specific behaviour (double SHA256).
+    /// write your own hasher if you want specific behaviour (e.g. double SHA256).
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// # #[macro_use] extern crate crypto;
     /// # #[macro_use] extern crate merkle_tree;
     /// # fn main() {
@@ -87,17 +144,18 @@ impl<H> MerkleTree<H>
     ///     use crypto::sha2::Sha512;
     ///     type MT = MerkleTree<Sha512>;
     ///
-    ///     let t: MT = MT::from_leaves_with_hasher(&[&[1u8]], Sha512::new());
+    ///     let block = "Hello World".as_bytes();
+    ///     let _t: MT = MT::build_from_blocks_with_hasher(&[&block], Sha512::new());
     /// }
     /// ```
-    pub fn from_leaves_with_hasher(raw_leaves: &[&[u8]], hasher: H) -> MerkleTree<H>
+    pub fn build_from_blocks_with_hasher(blocks: &[&[u8]], mut hasher: H) -> MerkleTree<H>
         where H: Digest
     {
-        let leaves: Vec<Node> = raw_leaves.iter().map(|l| Node { hash: *l, _type: NodeType::Leaf, left: None, right: None }).collect();
+        let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
         MerkleTree {
-            hasher: hasher,
-            root: build_from_leaves(&leaves),
-            leaves: leaves
+            // leaves: leaves.iter().map(|l| &l).collect().as_slice(),
+            root: build_from_leaves(leaves, &mut hasher),
+            hasher: hasher
         }
     }
 
