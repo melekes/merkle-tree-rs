@@ -12,6 +12,7 @@
 //! Merkle Tree container, implemented as a binary tree
 
 extern crate crypto;
+extern crate rustc_serialize;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -167,6 +168,37 @@ impl<H> MerkleTree<H>
         }
     }
 
+    /// Returns root hash of the tree.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let block = "Hello World".as_bytes();
+    /// let t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block]);
+    /// assert!(t.root_hash().len() > 0);
+    /// ```
+    pub fn root_hash(&self) -> Vec<u8> {
+        self.root.hash.clone()
+    }
+
+    /// Returns root hash of the tree as string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let block = "Hello World".as_bytes();
+    /// let t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block]);
+    /// assert_ne!("", t.root_hash_str());
+    /// ```
+    pub fn root_hash_str(&self) -> String {
+        use rustc_serialize::hex::ToHex;
+
+        self.root.hash.clone().as_slice().to_hex()
+    }
 }
 
 /// The default [`Hasher`] used by [`MerkleTree`].
@@ -240,5 +272,13 @@ mod test_tree {
     fn test_even_number_of_blocks() {
         let block = "Hello World".as_bytes();
         let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block, &block, &block]);
+    }
+
+    #[test]
+    fn test_hash_stays_the_same_if_data_hasnt_been_changed() {
+        let block = "Hello World".as_bytes();
+        let t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block]);
+        // root hash should stay the same if data hasn't been changed
+        assert_eq!("6b86e6e9c1bc3f101c2ff7d686fd648e76236e9f7a9d5bc9fb997cd22ddb0c1c", t.root_hash_str());
     }
 }
