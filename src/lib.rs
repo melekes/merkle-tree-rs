@@ -20,18 +20,12 @@ use crypto::sha2::Sha256;
 const LEAF_SIG: u8 = 0u8;
 const INTERNAL_SIG: u8 = 1u8;
 
-#[derive(Debug)]
-struct Node {
-    hash: Vec<u8>,
-    left: Option<Box<Node>>,
-    right: Option<Box<Node>>,
-}
+type Node = Vec<u8>;
 
 pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
-    root: Node,
-    // we need to store read-only links to leafs in order to implement contains API
-    // leaves: &'a [&'a Node<'a>],
+    nodes: Vec<Node>,
+    count_internal_nodes: usize,
 }
 
 fn build_leaf_node<H>(block: &[u8], hasher: &mut H) -> Node
@@ -50,63 +44,94 @@ fn build_leaf_node<H>(block: &[u8], hasher: &mut H) -> Node
     hasher.input(block_hash.as_slice());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: None, right: None }
+    result
 }
 
-fn build_internal_node_with_one_child<H>(child: Node, hasher: &mut H) -> Node
+fn build_internal_node_with_one_child<H>(child: &Node, hasher: &mut H) -> Node
     where H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
 
     hasher.reset();
     hasher.input(&[INTERNAL_SIG]);
-    hasher.input(child.hash.as_slice());
+    hasher.input(child.as_slice());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: Some(Box::new(child)), right: None }
+    result
 }
 
-fn build_internal_node<H>(child1: Node, child2: Node, hasher: &mut H) -> Node
+fn build_internal_node<H>(child1: &Node, child2: &Node, hasher: &mut H) -> Node
     where H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
 
     hasher.reset();
     hasher.input(&[INTERNAL_SIG]);
-    hasher.input(child1.hash.as_slice());
-    hasher.input(child2.hash.as_slice());
+    hasher.input(child1.as_slice());
+    hasher.input(child2.as_slice());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: Some(Box::new(child1)), right: Some(Box::new(child2)) }
+    result
 }
 
-fn build_upper_level<H>(nodes: &mut Vec<Node>, hasher: &mut H) -> Vec<Node>
+fn build_upper_level<H>(nodes: &[Node], hasher: &mut H) -> Vec<Node>
     where H: Digest
 {
     // 7 / 2 = 3. We could have applied ceil here, but adding `1` is much easier
     let mut row = Vec::with_capacity((nodes.len() + 1) / 2);
-    while nodes.len() > 0 {
-        if nodes.len() > 1 {
-            let n1 = nodes.remove(0);
-            let n2 = nodes.remove(0);
-            row.push(build_internal_node(n1, n2, hasher));
+    let mut i = 0;
+    while i < nodes.len() {
+        if i+1 < nodes.len() {
+            row.push(build_internal_node(&nodes[i], &nodes[i+1], hasher));
+            i += 2;
         } else {
-            row.push(build_internal_node_with_one_child(nodes.remove(0), hasher));
+            row.push(build_internal_node_with_one_child(&nodes[i], hasher));
+            i += 1;
         }
     }
+
+    if row.len() > 1 && row.len() % 2 != 0 {
+        let last_node = row.last().unwrap().clone();
+        row.push(last_node);
+    }
+
     row
 }
 
-fn build_from_leaves<H>(mut leaves: Vec<Node>, hasher: &mut H) -> Node
+fn build_internal_nodes<H>(nodes: &mut Vec<Node>, count_internal_nodes: usize, hasher: &mut H)
     where H: Digest
 {
-    let mut parents = build_upper_level(&mut leaves, hasher);
+    let mut parents = build_upper_level(&nodes[count_internal_nodes..], hasher);
+
+    let mut upper_level_start = count_internal_nodes - parents.len();
+    let mut upper_level_end = upper_level_start + parents.len();
+    nodes[upper_level_start..upper_level_end].clone_from_slice(&parents);
 
     while parents.len() > 1 {
-        parents = build_upper_level(&mut parents, hasher);
+        parents = build_upper_level(parents.as_slice(), hasher);
+
+        upper_level_start -= parents.len() - 1;
+        upper_level_end = upper_level_start + parents.len();
+        nodes[upper_level_start..upper_level_end].clone_from_slice(&parents);
     }
 
-    parents.remove(0)
+    nodes[0] = parents.remove(0);
+}
+
+fn next_power_of_2(n: usize) -> usize {
+    let mut v = n;
+    v -= 1;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v += 1;
+    v
+}
+
+fn calculate_internal_nodes_count(count_blocks: usize) -> usize {
+    next_power_of_2(count_blocks) - 1
 }
 
 impl<H> MerkleTree<H>
@@ -152,13 +177,26 @@ impl<H> MerkleTree<H>
         let count_blocks = blocks.len();
         assert!(count_blocks > 1, format!("expected more then 1 block, received {}", count_blocks));
 
-        let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
+        let count_internal_nodes = calculate_internal_nodes_count(count_blocks);
+
+        let mut nodes = vec![Vec::new(); count_internal_nodes + count_blocks];
+
+        // build leafs
+        let mut block_idx = count_internal_nodes;
+        for b in blocks {
+            nodes[block_idx] = build_leaf_node(*b, &mut hasher);
+            block_idx += 1;
+        }
+
+        build_internal_nodes(&mut nodes, count_internal_nodes, &mut hasher);
+
         MerkleTree {
-            // leaves: leaves.iter().map(|l| &l).collect().as_slice(),
-            root: build_from_leaves(leaves, &mut hasher),
-            hasher: hasher
+            hasher: hasher,
+            nodes: nodes,
+            count_internal_nodes: count_internal_nodes
         }
     }
+
 
     /// Returns root hash of the tree.
     ///
@@ -172,7 +210,7 @@ impl<H> MerkleTree<H>
     /// assert!(t.root_hash().len() > 0);
     /// ```
     pub fn root_hash(&self) -> Vec<u8> {
-        self.root.hash.clone()
+        self.nodes[0].clone()
     }
 
     /// Returns root hash of the tree as string.
@@ -189,7 +227,7 @@ impl<H> MerkleTree<H>
     pub fn root_hash_str(&self) -> String {
         use rustc_serialize::hex::ToHex;
 
-        self.root.hash.clone().as_slice().to_hex()
+        self.nodes[0].clone().as_slice().to_hex()
     }
 }
 
