@@ -229,4 +229,16 @@ mod test_tree {
     fn test_0_blocks() {
         let _t: MerkleTree = MerkleTree::build_from_blocks(&[]);
     }
+
+    #[test]
+    fn test_odd_number_of_blocks() {
+        let block = "Hello World".as_bytes();
+        let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block, &block]);
+    }
+
+    #[test]
+    fn test_even_number_of_blocks() {
+        let block = "Hello World".as_bytes();
+        let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block, &block, &block]);
+    }
 }
