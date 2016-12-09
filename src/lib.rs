@@ -68,7 +68,7 @@ fn build_internal_node_with_one_child<H>(child: Node, hasher: &mut H) -> Node
 fn build_internal_node<H>(child1: Node, child2: Node, hasher: &mut H) -> Node
     where H: Digest
 {
-    let mut result = Vec::<u8>::with_capacity(hasher.output_bits() / 8);
+    let mut result = vec![0u8; hasher.output_bits() / 8];
 
     hasher.reset();
     hasher.input(&[INTERNAL_SIG]);
@@ -86,7 +86,9 @@ fn build_upper_level<H>(nodes: &mut Vec<Node>, hasher: &mut H) -> Vec<Node>
     let mut row = Vec::with_capacity((nodes.len() + 1) / 2);
     while nodes.len() > 0 {
         if nodes.len() > 1 {
-            row.push(build_internal_node(nodes.remove(0), nodes.remove(1), hasher));
+            let n1 = nodes.remove(0);
+            let n2 = nodes.remove(0);
+            row.push(build_internal_node(n1, n2, hasher));
         } else {
             row.push(build_internal_node_with_one_child(nodes.remove(0), hasher));
         }
@@ -117,11 +119,14 @@ impl<H> MerkleTree<H>
     /// use merkle_tree::MerkleTree;
     ///
     /// let block = "Hello World".as_bytes();
-    /// let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block]);
+    /// let _t: MerkleTree = MerkleTree::build_from_blocks(&[&block, &block]);
     /// ```
     pub fn build_from_blocks(blocks: &[&[u8]]) -> MerkleTree<H>
         where H: Digest + Default
     {
+        let count_blocks = blocks.len();
+        assert!(count_blocks > 1, format!("expected more then 1 block, received {}", count_blocks));
+
         let mut hasher = Default::default();
         let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
         MerkleTree {
@@ -145,12 +150,15 @@ impl<H> MerkleTree<H>
     ///     type MT = MerkleTree<Sha512>;
     ///
     ///     let block = "Hello World".as_bytes();
-    ///     let _t: MT = MT::build_from_blocks_with_hasher(&[&block], Sha512::new());
+    ///     let _t: MT = MT::build_from_blocks_with_hasher(&[&block, &block], Sha512::new());
     /// }
     /// ```
     pub fn build_from_blocks_with_hasher(blocks: &[&[u8]], mut hasher: H) -> MerkleTree<H>
         where H: Digest
     {
+        let count_blocks = blocks.len();
+        assert!(count_blocks > 1, format!("expected more then 1 block, received {}", count_blocks));
+
         let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
         MerkleTree {
             // leaves: leaves.iter().map(|l| &l).collect().as_slice(),
@@ -172,6 +180,7 @@ impl DefaultHasher {
     }
 }
 
+/// Implementation of the Default trait from std library
 impl Default for DefaultHasher {
     /// Creates a new `DefaultHasher` using [`DefaultHasher::new`]. See
     /// [`DefaultHasher::new`] documentation for more information.
@@ -182,6 +191,7 @@ impl Default for DefaultHasher {
     }
 }
 
+/// Implementation of the Digest trait from crypto library for our DefaultHasher
 impl Digest for DefaultHasher {
     #[inline]
     fn input(&mut self, d: &[u8]) {
@@ -215,6 +225,8 @@ mod test_tree {
     use super::crypto::sha2::Sha256;
 
     #[test]
-    fn test_build_from_leaves() {
+    #[should_panic]
+    fn test_0_blocks() {
+        let _t: MerkleTree = MerkleTree::build_from_blocks(&[]);
     }
 }
