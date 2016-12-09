@@ -136,7 +136,7 @@ impl<H> MerkleTree<H>
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```
     /// # #[macro_use] extern crate crypto;
     /// # #[macro_use] extern crate merkle_tree;
     /// # fn main() {
