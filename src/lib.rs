@@ -125,16 +125,8 @@ impl<H> MerkleTree<H>
     pub fn build_from_blocks(blocks: &[&[u8]]) -> MerkleTree<H>
         where H: Digest + Default
     {
-        let count_blocks = blocks.len();
-        assert!(count_blocks > 1, format!("expected more then 1 block, received {}", count_blocks));
-
         let mut hasher = Default::default();
-        let leaves: Vec<Node> = blocks.iter().map(|b| build_leaf_node(*b, &mut hasher)).collect();
-        MerkleTree {
-            // leaves: leaves.iter().map(|l| &l).collect(),
-            root: build_from_leaves(leaves, &mut hasher),
-            hasher: hasher
-        }
+        MerkleTree::build_from_blocks_with_hasher(blocks, hasher)
     }
 
     /// Hasher could be any object, which implements `crypto::digest::Digest` trait. You could
