@@ -9,7 +9,7 @@
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
 
-//! Merkle Tree container, implemented as a binary tree
+//! Merkle Tree implementation
 
 extern crate crypto;
 extern crate rustc_serialize;
@@ -23,6 +23,12 @@ const INTERNAL_SIG: u8 = 1u8;
 
 type Hash = Vec<u8>;
 
+/// Merkle Tree is a binary tree, which nodes values are the hash of the
+/// concatenated values of their descendants hashes.
+///
+/// See:
+///   1. https://en.wikipedia.org/wiki/Merkle_tree
+///   2. https://en.bitcoin.it/wiki/Protocol_documentation#Merkle_Trees
 pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
     nodes: Vec<Hash>,
