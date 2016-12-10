@@ -21,33 +21,31 @@ use std::fmt;
 const LEAF_SIG: u8 = 0u8;
 const INTERNAL_SIG: u8 = 1u8;
 
-struct Node<T>
+struct Node
 {
     hash: Vec<u8>,
-    left: Option<Box<Node<T>>>,
-    right: Option<Box<Node<T>>>,
-    value: Option<T>,
+    left: Option<Box<Node>>,
+    right: Option<Box<Node>>,
 }
 
-impl<T> Node<T> {
+impl Node {
     fn is_leaf(&self) -> bool {
-        self.value.is_some()
+        self.left.is_none() && self.right.is_none()
     }
 
     fn hash_str(&self) -> String {
         use rustc_serialize::hex::ToHex;
-
         self.hash.as_slice().to_hex()
     }
 }
 
-pub struct MerkleTree<T, H = DefaultHasher> {
+pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
-    root: Node<T>,
+    root: Node,
 }
 
-fn build_leaf_node<T, H>(value: &T, hasher: &mut H) -> Node<T>
-    where T: AsBytes + Clone, H: Digest
+fn build_leaf_node<T, H>(value: &T, hasher: &mut H) -> Node
+    where T: AsBytes, H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
 
@@ -56,10 +54,10 @@ fn build_leaf_node<T, H>(value: &T, hasher: &mut H) -> Node<T>
     hasher.input(value.as_bytes());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: None, right: None, value: Some((*value).clone()) }
+    Node { hash: result, left: None, right: None }
 }
 
-fn build_internal_node_with_one_child<T, H>(left: Node<T>, hasher: &mut H) -> Node<T>
+fn build_internal_node_with_one_child<H>(left: Node, hasher: &mut H) -> Node
     where H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
@@ -71,10 +69,10 @@ fn build_internal_node_with_one_child<T, H>(left: Node<T>, hasher: &mut H) -> No
     hasher.input(left.hash.as_slice());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: Some(Box::new(left)), right: None, value: None }
+    Node { hash: result, left: Some(Box::new(left)), right: None }
 }
 
-fn build_internal_node<T, H>(left: Node<T>, right: Node<T>, hasher: &mut H) -> Node<T>
+fn build_internal_node<H>(left: Node, right: Node, hasher: &mut H) -> Node
     where H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
@@ -85,10 +83,10 @@ fn build_internal_node<T, H>(left: Node<T>, right: Node<T>, hasher: &mut H) -> N
     hasher.input(right.hash.as_slice());
     hasher.result(result.as_mut_slice());
 
-    Node { hash: result, left: Some(Box::new(left)), right: Some(Box::new(right)), value: None }
+    Node { hash: result, left: Some(Box::new(left)), right: Some(Box::new(right)) }
 }
 
-fn build_upper_level<T, H>(nodes: &mut Vec<Node<T>>, hasher: &mut H) -> Vec<Node<T>>
+fn build_upper_level<H>(nodes: &mut Vec<Node>, hasher: &mut H) -> Vec<Node>
     where H: Digest
 {
     let mut row = Vec::with_capacity((nodes.len() + 1) / 2);
@@ -104,7 +102,7 @@ fn build_upper_level<T, H>(nodes: &mut Vec<Node<T>>, hasher: &mut H) -> Vec<Node
     row
 }
 
-fn build_from_leaves<T, H>(mut leaves: Vec<Node<T>>, hasher: &mut H) -> Node<T>
+fn build_from_leaves<H>(mut leaves: Vec<Node>, hasher: &mut H) -> Node
     where H: Digest
 {
     let mut parents = build_upper_level(&mut leaves, hasher);
@@ -116,8 +114,7 @@ fn build_from_leaves<T, H>(mut leaves: Vec<Node<T>>, hasher: &mut H) -> Node<T>
     parents.remove(0)
 }
 
-impl<T, H> MerkleTree<T, H>
-where T: AsBytes + Clone + fmt::Debug
+impl<H> MerkleTree<H>
 {
     /// Constructs a tree from values of data. Data could be anything as long as it could be
     /// represented as bytes array.
@@ -128,10 +125,10 @@ where T: AsBytes + Clone + fmt::Debug
     /// use merkle_tree::MerkleTree;
     ///
     /// let block = "Hello World";
-    /// let _t: MerkleTree<&str> = MerkleTree::build(&[block, block]);
+    /// let _t: MerkleTree = MerkleTree::build(&[block, block]);
     /// ```
-    pub fn build(values: &[T]) -> MerkleTree<T, H>
-        where H: Digest + Default
+    pub fn build<T>(values: &[T]) -> MerkleTree<H>
+        where H: Digest + Default, T: AsBytes + fmt::Debug
     {
         let mut hasher = Default::default();
         MerkleTree::build_with_hasher(values, hasher)
@@ -148,23 +145,23 @@ where T: AsBytes + Clone + fmt::Debug
     /// # fn main() {
     ///     use merkle_tree::MerkleTree;
     ///     use crypto::sha2::Sha512;
-    ///     type MT = MerkleTree<&'static str, Sha512>;
+    ///     type MT = MerkleTree<Sha512>;
     ///
     ///     let block = "Hello World";
     ///     let _t: MT = MT::build_with_hasher(&[block, block], Sha512::new());
     /// }
     /// ```
-    pub fn build_with_hasher(values: &[T], mut hasher: H) -> MerkleTree<T, H>
-        where H: Digest
+    pub fn build_with_hasher<T>(values: &[T], mut hasher: H) -> MerkleTree<H>
+        where H: Digest, T: AsBytes + fmt::Debug
     {
         let count_values = values.len();
         assert!(count_values > 1, format!("expected more then 1 value, received {}", count_values));
 
-        let leaves: Vec<Node<T>> = values.iter().map(|v| build_leaf_node(v, &mut hasher)).collect();
+        let leaves: Vec<Node> = values.iter().map(|v| build_leaf_node(v, &mut hasher)).collect();
 
         MerkleTree {
             root: build_from_leaves(leaves, &mut hasher),
-            hasher: hasher
+            hasher: hasher,
         }
     }
 
@@ -176,7 +173,7 @@ where T: AsBytes + Clone + fmt::Debug
     /// use merkle_tree::MerkleTree;
     ///
     /// let block = "Hello World";
-    /// let t: MerkleTree<&str> = MerkleTree::build(&[block, block]);
+    /// let t: MerkleTree = MerkleTree::build(&[block, block]);
     /// assert!(t.root_hash().len() > 0);
     /// ```
     pub fn root_hash(&self) -> Vec<u8> {
@@ -191,7 +188,7 @@ where T: AsBytes + Clone + fmt::Debug
     /// use merkle_tree::MerkleTree;
     ///
     /// let block = "Hello World";
-    /// let t: MerkleTree<&str> = MerkleTree::build(&[block, block]);
+    /// let t: MerkleTree = MerkleTree::build(&[block, block]);
     /// assert_ne!("", t.root_hash_str());
     /// ```
     pub fn root_hash_str(&self) -> String {
@@ -270,11 +267,11 @@ impl<'a> AsBytes for &'a [u8] {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Node<T>
+impl fmt::Debug for Node
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.is_leaf() {
-            write!(f, "{:?}: {:?}", self.hash_str(), self.value)
+            write!(f, "{:?}", self.hash_str())
         } else {
             write!(f, "{:?}: (l: {:?}, r: {:?})", self.hash_str(), self.left, self.right)
         }
@@ -289,25 +286,25 @@ mod test_tree {
     #[test]
     #[should_panic]
     fn test_0_blocks() {
-        let _t: MerkleTree<&str> = MerkleTree::build(&[]);
+        let _t: MerkleTree = MerkleTree::build::<String>(&[]);
     }
 
     #[test]
     fn test_odd_number_of_blocks() {
         let block = "Hello World";
-        let _t: MerkleTree<&str> = MerkleTree::build(&[block, block, block]);
+        let _t: MerkleTree = MerkleTree::build(&[block, block, block]);
     }
 
     #[test]
     fn test_even_number_of_blocks() {
         let block = "Hello World";
-        let _t: MerkleTree<&str> = MerkleTree::build(&[block, block, block, block]);
+        let _t: MerkleTree = MerkleTree::build(&[block, block, block, block]);
     }
 
     #[test]
     fn test_hash_stays_the_same_if_data_hasnt_been_changed() {
         let block = "Hello World";
-        let t: MerkleTree<&str> = MerkleTree::build(&[block, block]);
+        let t: MerkleTree = MerkleTree::build(&[block, block]);
         // root hash should stay the same if data hasn't been changed
         assert_eq!("c9978dc3e2d729207ca4c012de993423f19e7bf02161f7f95cdbf28d1b57b88a", t.root_hash_str());
     }
