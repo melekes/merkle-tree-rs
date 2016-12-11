@@ -1,9 +1,9 @@
-// #![deny(missing_docs,
-//         missing_debug_implementations, missing_copy_implementations,
-//         trivial_casts, trivial_numeric_casts,
-//         unsafe_code,
-//         unstable_features,
-//         unused_import_braces, unused_qualifications)]
+#![deny(missing_docs,
+        missing_debug_implementations, missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unsafe_code,
+        unstable_features,
+        unused_import_braces, unused_qualifications)]
 
 #![cfg_attr(feature = "dev", allow(unstable_features))]
 #![cfg_attr(feature = "dev", feature(plugin))]
@@ -26,9 +26,81 @@ type Hash = Vec<u8>;
 /// Merkle Tree is a binary tree, which nodes values are the hash of the
 /// concatenated values of their descendants hashes.
 ///
-/// See:
-///   1. https://en.wikipedia.org/wiki/Merkle_tree
-///   2. https://en.bitcoin.it/wiki/Protocol_documentation#Merkle_Trees
+/// Main article: https://en.wikipedia.org/wiki/Merkle_tree
+///
+/// # Storage Format
+///
+/// A binary tree is stored in a vector in breadth-first order. That is, starting with the root we go from left to right at every level.
+///
+/// ```
+///     1
+///   2   3
+///  4 5 6 7
+/// ```
+///
+/// Vector:
+///
+/// ```
+/// [1 2 3 4 5 6 7]
+/// ```
+///
+/// While building a tree, if there is an odd number of nodes at the given
+/// level, the last node will be duplicated. Otherwise, the tree won't be
+/// complete. And we need it to be complete in order to "2i 2i+1" schema to
+/// work.
+///
+/// # Defence against potential attacks
+///
+/// To defend against the second-preimage attack, when we calculate the hash we
+/// prepend data with 0x00 - for leaves, 0x01 - for internal nodes.
+///
+/// By default, we use SHA256. But you can pass your hash function (for example, double SHA256).
+///
+/// # Usage
+///
+/// Let's say you have a file. You split it into 100 blocks and build a tree.
+///
+/// ```rust
+/// use merkle_tree::MerkleTree;
+///
+/// let t: merkletree = merkletree::build(&blocks);
+/// ```
+///
+/// block could be anything, as long as it implements `AsBytes` trait. In order
+/// to encode the numbers, you can use https://github.com/BurntSushi/byteorder
+/// library. If the block is an array of bytes, you don't have to do anything.
+///
+/// As we mentioned earlier, you can pass your hash function:
+///
+/// ```
+/// use merkle_tree::MerkleTree;
+///
+/// let t: merkletree = merkletree::build(&blocks, MyAwesomeHasher::new());
+/// ```
+///
+/// Then you somehow make a secure copy of the root hash.
+///
+/// ```
+/// t.root_hash();
+/// ```
+///
+/// You can now copy leaves from any source.
+///
+/// ```
+/// t.leaves();
+/// ```
+///
+/// If we verify that those leaves sum up to the root_hash, we can use them to
+/// verify the blocks. Blocks could be received and checked one by one.
+///
+/// ```
+/// let t: merkletree = merkletree::verify_leaves(&leaves);
+/// assert_eq!(secure_copy_of_root_hash, t.root_hash());
+///
+/// assert!(t.verify(block_index, &block));
+/// ```
+///
+/// where `block_index` - index of a block (starts at 0).
 pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
     nodes: Vec<Hash>,
