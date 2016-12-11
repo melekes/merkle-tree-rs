@@ -32,7 +32,7 @@ type Hash = Vec<u8>;
 ///
 /// A binary tree is stored in a vector in breadth-first order. That is, starting with the root we go from left to right at every level.
 ///
-/// ```
+/// ```text
 ///     1
 ///   2   3
 ///  4 5 6 7
@@ -40,7 +40,7 @@ type Hash = Vec<u8>;
 ///
 /// Vector:
 ///
-/// ```
+/// ```text
 /// [1 2 3 4 5 6 7]
 /// ```
 ///
@@ -60,10 +60,10 @@ type Hash = Vec<u8>;
 ///
 /// Let's say you have a file. You split it into 100 blocks and build a tree.
 ///
-/// ```rust
+/// ```text
 /// use merkle_tree::MerkleTree;
 ///
-/// let t: merkletree = merkletree::build(&blocks);
+/// let t: MerkleTree = MerkleTree::build(&blocks);
 /// ```
 ///
 /// block could be anything, as long as it implements `AsBytes` trait. In order
@@ -72,35 +72,36 @@ type Hash = Vec<u8>;
 ///
 /// As we mentioned earlier, you can pass your hash function:
 ///
-/// ```
+/// ```text
 /// use merkle_tree::MerkleTree;
 ///
-/// let t: merkletree = merkletree::build(&blocks, MyAwesomeHasher::new());
+/// let t: MerkleTree = MerkleTree::build(&blocks, MyAwesomeHasher::new());
 /// ```
 ///
 /// Then you somehow make a secure copy of the root hash.
 ///
-/// ```
+/// ```text
 /// t.root_hash();
 /// ```
 ///
 /// You can now copy leaves from any source.
 ///
-/// ```
+/// ```text
 /// t.leaves();
 /// ```
 ///
 /// If we verify that those leaves sum up to the root_hash, we can use them to
 /// verify the blocks. Blocks could be received and checked one by one.
 ///
-/// ```
-/// let t: merkletree = merkletree::verify_leaves(&leaves);
+/// ```text
+/// let t: MerkleTree = MerkleTree::build_from_leaves(&leaves);
 /// assert_eq!(secure_copy_of_root_hash, t.root_hash());
 ///
 /// assert!(t.verify(block_index, &block));
 /// ```
 ///
 /// where `block_index` - index of a block (starts at 0).
+#[derive(Debug)]
 pub struct MerkleTree<H = DefaultHasher> {
     hasher: H,
     nodes: Vec<Hash>,
@@ -225,7 +226,7 @@ impl<H> MerkleTree<H>
     pub fn build<T>(values: &[T]) -> MerkleTree<H>
         where H: Digest + Default, T: AsBytes
     {
-        let mut hasher = Default::default();
+        let hasher = Default::default();
         MerkleTree::build_with_hasher(values, hasher)
     }
 
@@ -328,6 +329,7 @@ impl<H> MerkleTree<H>
 }
 
 /// The default [`Hasher`] used by [`MerkleTree`].
+#[derive(Copy, Clone)]
 pub struct DefaultHasher(Sha256);
 
 impl DefaultHasher {
@@ -376,7 +378,17 @@ impl Digest for DefaultHasher {
     }
 }
 
+impl fmt::Debug for DefaultHasher {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Sha256 does not implement Display or Debug traits
+        write!(f, "DefaultHasher {{ Sha256 }}")
+    }
+}
+
+/// `AsBytes` is implemeted for types which are given as values to
+/// `MerkleTree::build` method.
 pub trait AsBytes {
+    /// Converts value into the byte slice.
     fn as_bytes(&self) -> &[u8];
 }
 
@@ -401,7 +413,6 @@ impl<'a> AsBytes for &'a [u8] {
 #[cfg(test)]
 mod test_tree {
     use super::MerkleTree;
-    use super::crypto::sha2::Sha256;
 
     #[test]
     #[should_panic]

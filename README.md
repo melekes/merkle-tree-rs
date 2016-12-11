@@ -47,7 +47,7 @@ binary tree). Условие полноты необходимо для опис
 ```rust
 use merkle_tree::MerkleTree;
 
-let t: merkletree = merkletree::build(&blocks);
+let t: MerkleTree = MerkleTree::build(&blocks);
 ```
 
 В качестве блока может быть что угодно, до тех пор пока оно реализует trait
@@ -60,7 +60,7 @@ https://github.com/BurntSushi/byteorder . Если это уже массив б
 ```
 use merkle_tree::MerkleTree;
 
-let t: merkletree = merkletree::build(&blocks, MyAwesomeHasher::new());
+let t: MerkleTree = MerkleTree::build(&blocks, MyAwesomeHasher::new());
 ```
 
 Дальше вы каким-то магическим образом безопасно копируете root hash.
