@@ -14,6 +14,8 @@
 extern crate crypto;
 extern crate rustc_serialize;
 
+mod utils;
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use std::fmt;
@@ -194,20 +196,8 @@ fn build_internal_nodes<H>(nodes: &mut Vec<Hash>, count_internal_nodes: usize, h
     nodes[0] = parents.remove(0);
 }
 
-fn next_power_of_2(n: usize) -> usize {
-    let mut v = n;
-    v -= 1;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v += 1;
-    v
-}
-
 fn calculate_internal_nodes_count(count_leaves: usize) -> usize {
-    next_power_of_2(count_leaves) - 1
+    utils::next_power_of_2(count_leaves) - 1
 }
 
 impl<H> MerkleTree<H>
