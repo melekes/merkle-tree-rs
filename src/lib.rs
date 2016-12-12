@@ -471,13 +471,13 @@ pub trait AsBytes {
 
 impl<'a> AsBytes for &'a str {
     fn as_bytes(&self) -> &[u8] {
-        str::as_bytes(&self)
+        str::as_bytes(self)
     }
 }
 
 impl AsBytes for String {
     fn as_bytes(&self) -> &[u8] {
-        String::as_bytes(&self)
+        String::as_bytes(self)
     }
 }
 
