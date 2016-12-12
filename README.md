@@ -184,6 +184,7 @@ struct MerkleTree {
 1. Предоставить реализации AsBytes для большего кол-ва типов.
 2. В методе `build_upper_level` складывать новые узлы не в новый массив, а в
    `nodes` (in-place).
+3. Разобраться с "rust cannot infer type for _" (`let _t: MerkleTree`).
 
 ## Development
 
