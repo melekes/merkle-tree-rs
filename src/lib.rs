@@ -204,6 +204,27 @@ fn calculate_internal_nodes_count(count_leaves: usize) -> usize {
     utils::next_power_of_2(count_leaves) - 1
 }
 
+
+fn _build_from_leaves_with_hasher<H>(leaves: &[Hash], mut hasher: H) -> MerkleTree<H>
+    where H: Digest
+{
+    let count_leaves = leaves.len();
+    let count_internal_nodes = calculate_internal_nodes_count(count_leaves);
+    let mut nodes = vec![Vec::new(); count_internal_nodes + count_leaves];
+
+    // copy leafs
+    nodes[count_internal_nodes..].clone_from_slice(leaves);
+
+    build_internal_nodes(&mut nodes, count_internal_nodes, &mut hasher);
+
+    MerkleTree {
+        nodes: nodes,
+        count_internal_nodes: count_internal_nodes,
+        count_leaves: count_leaves,
+        hasher: hasher,
+    }
+}
+
 impl<H> MerkleTree<H>
 {
     /// Constructs a tree from values of data. Data could be anything as long as it could be
@@ -224,6 +245,9 @@ impl<H> MerkleTree<H>
         MerkleTree::build_with_hasher(values, hasher)
     }
 
+    /// Constructs a tree from values of data. Data could be anything as long as it could be
+    /// represented as bytes array.
+    ///
     /// Hasher could be any object, which implements `crypto::digest::Digest` trait. You could
     /// write your own hasher if you want specific behaviour (e.g. double SHA256).
     ///
@@ -247,24 +271,62 @@ impl<H> MerkleTree<H>
         let count_leaves = values.len();
         assert!(count_leaves > 1, format!("expected more then 1 value, received {}", count_leaves));
 
-        let count_internal_nodes = calculate_internal_nodes_count(count_leaves);
-        let mut nodes = vec![Vec::new(); count_internal_nodes + count_leaves];
+        let leaves: Vec<Hash> = values.iter().map(|v| hash_leaf_node(v, &mut hasher)).collect();
 
-        // build leafs
-        let mut block_idx = count_internal_nodes;
-        for v in values {
-            nodes[block_idx] = hash_leaf_node(v, &mut hasher);
-            block_idx += 1;
-        }
+        _build_from_leaves_with_hasher(leaves.as_slice(), hasher)
+    }
 
-        build_internal_nodes(&mut nodes, count_internal_nodes, &mut hasher);
+    /// Constructs a tree from its leaves.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let block = "Hello World";
+    /// let t1: MerkleTree = MerkleTree::build(&[block, block]);
+    ///
+    /// let t2: MerkleTree = MerkleTree::build_from_leaves(t1.leaves());
+    ///
+    /// assert_eq!(t1.root_hash(), t2.root_hash());
+    /// ```
+    pub fn build_from_leaves(leaves: &[Hash]) -> MerkleTree<H>
+        where H: Digest + Default
+    {
+        let hasher = Default::default();
+        MerkleTree::build_from_leaves_with_hasher(leaves, hasher)
+    }
 
-        MerkleTree {
-            nodes: nodes,
-            count_internal_nodes: count_internal_nodes,
-            count_leaves: count_leaves,
-            hasher: hasher,
-        }
+    /// Constructs a tree from its leaves.
+    ///
+    /// Hasher could be any object, which implements `crypto::digest::Digest` trait. You could
+    /// write your own hasher if you want specific behaviour (e.g. double SHA256).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[macro_use] extern crate crypto;
+    /// # #[macro_use] extern crate merkle_tree;
+    /// # fn main() {
+    ///     use merkle_tree::MerkleTree;
+    ///     use crypto::sha2::Sha512;
+    ///     type MT = MerkleTree<Sha512>;
+    ///
+    ///     let block = "Hello World";
+    ///     let t1: MT = MT::build_with_hasher(&[block, block], Sha512::new());
+    ///
+    ///     let t2: MT = MT::build_from_leaves_with_hasher(t1.leaves(), Sha512::new());
+    ///
+    ///     assert_eq!(t1.root_hash(), t2.root_hash());
+    /// }
+    /// ```
+    pub fn build_from_leaves_with_hasher(leaves: &[Hash], mut hasher: H) -> MerkleTree<H>
+        where H: Digest
+    {
+        let count_leaves = leaves.len();
+        assert!(count_leaves > 1, format!("expected more then 1 leaf, received {}", count_leaves));
+
+        _build_from_leaves_with_hasher(leaves, hasher)
     }
 
     /// Returns the root hash of the tree.
@@ -300,6 +362,22 @@ impl<H> MerkleTree<H>
         self.nodes[0].as_slice().to_hex()
     }
 
+    /// Returns the leaves of the tree.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let block = "Hello World";
+    /// let t: MerkleTree = MerkleTree::build(&[block, block]);
+    ///
+    /// assert_eq!(2, t.leaves().len());
+    /// ```
+    pub fn leaves(&self) -> &[Hash] {
+        &self.nodes[self.count_internal_nodes..]
+    }
+
     /// Verify value by comparing its hash against the one in the tree. `position` must not
     /// exceed count of leaves and starts at 0.
     ///
@@ -322,86 +400,6 @@ impl<H> MerkleTree<H>
 
         self.nodes[self.count_internal_nodes + position].as_slice() ==
             hash_leaf_node(value, &mut self.hasher).as_slice()
-    }
-
-    /// Returns the leaves of the tree.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use merkle_tree::MerkleTree;
-    ///
-    /// let block = "Hello World";
-    /// let t: MerkleTree = MerkleTree::build(&[block, block]);
-    ///
-    /// assert_eq!(2, t.leaves().len());
-    /// ```
-    pub fn leaves(&self) -> &[Hash] {
-        &self.nodes[self.count_internal_nodes..]
-    }
-
-    /// Constructs a tree from its leaves.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use merkle_tree::MerkleTree;
-    ///
-    /// let block = "Hello World";
-    /// let t1: MerkleTree = MerkleTree::build(&[block, block]);
-    ///
-    /// let t2: MerkleTree = MerkleTree::build_from_leaves(t1.leaves());
-    ///
-    /// assert_eq!(t1.root_hash(), t2.root_hash());
-    /// ```
-    pub fn build_from_leaves(leaves: &[Hash]) -> MerkleTree<H>
-        where H: Digest + Default
-    {
-        let hasher = Default::default();
-        MerkleTree::build_from_leaves_with_hasher(leaves, hasher)
-    }
-
-    /// Hasher could be any object, which implements `crypto::digest::Digest` trait. You could
-    /// write your own hasher if you want specific behaviour (e.g. double SHA256).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[macro_use] extern crate crypto;
-    /// # #[macro_use] extern crate merkle_tree;
-    /// # fn main() {
-    ///     use merkle_tree::MerkleTree;
-    ///     use crypto::sha2::Sha512;
-    ///     type MT = MerkleTree<Sha512>;
-    ///
-    ///     let block = "Hello World";
-    ///     let t1: MT = MT::build_with_hasher(&[block, block], Sha512::new());
-    ///
-    ///     let t2: MT = MT::build_from_leaves_with_hasher(t1.leaves(), Sha512::new());
-    ///
-    ///     assert_eq!(t1.root_hash(), t2.root_hash());
-    /// }
-    /// ```
-    pub fn build_from_leaves_with_hasher(leaves: &[Hash], mut hasher: H) -> MerkleTree<H>
-        where H: Digest
-    {
-        let count_leaves = leaves.len();
-        assert!(count_leaves > 1, format!("expected more then 1 leaf, received {}", count_leaves));
-
-        let count_internal_nodes = calculate_internal_nodes_count(count_leaves);
-        let mut nodes = vec![Vec::new(); count_internal_nodes + count_leaves];
-
-        // copy leafs
-        nodes[count_internal_nodes..].clone_from_slice(leaves);
-
-        build_internal_nodes(&mut nodes, count_internal_nodes, &mut hasher);
-
-        MerkleTree {
-            nodes: nodes,
-            count_internal_nodes: count_internal_nodes,
-            count_leaves: count_leaves,
-            hasher: hasher,
-        }
     }
 }
 
@@ -488,7 +486,7 @@ impl<'a> AsBytes for &'a [u8] {
 }
 
 #[cfg(test)]
-mod test_tree {
+mod tests {
     use super::MerkleTree;
 
     #[test]
