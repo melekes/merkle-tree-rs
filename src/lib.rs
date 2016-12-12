@@ -115,7 +115,7 @@ pub struct MerkleTree<H = DefaultHasher> {
     count_leaves: usize,
 }
 
-fn hash_leaf_node<T, H>(value: &T, hasher: &mut H) -> Hash
+fn hash_leaf<T, H>(value: &T, hasher: &mut H) -> Hash
     where T: AsBytes, H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
@@ -260,7 +260,7 @@ impl<H> MerkleTree<H>
         let count_leaves = values.len();
         assert!(count_leaves > 1, format!("expected more then 1 value, received {}", count_leaves));
 
-        let leaves: Vec<Hash> = values.iter().map(|v| hash_leaf_node(v, &mut hasher)).collect();
+        let leaves: Vec<Hash> = values.iter().map(|v| hash_leaf(v, &mut hasher)).collect();
 
         _build_from_leaves_with_hasher(leaves.as_slice(), hasher)
     }
@@ -388,7 +388,7 @@ impl<H> MerkleTree<H>
         assert!(position < self.count_leaves, "position does not relate to any leaf");
 
         self.nodes[self.count_internal_nodes + position].as_slice() ==
-            hash_leaf_node(value, &mut self.hasher).as_slice()
+            hash_leaf(value, &mut self.hasher).as_slice()
     }
 }
 
