@@ -128,7 +128,7 @@ fn hash_leaf_node<T, H>(value: &T, hasher: &mut H) -> Hash
     result
 }
 
-fn hash_internal_node_with_one_child<H>(left: &Hash, hasher: &mut H) -> Hash
+fn hash_internal_node<H>(left: &Hash, right: Option<&Hash>, hasher: &mut H) -> Hash
     where H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
@@ -136,22 +136,12 @@ fn hash_internal_node_with_one_child<H>(left: &Hash, hasher: &mut H) -> Hash
     hasher.reset();
     hasher.input(&[INTERNAL_SIG]);
     hasher.input(left.as_slice());
-    // if there is no right node, we hash left with itself
-    hasher.input(left.as_slice());
-    hasher.result(result.as_mut_slice());
-
-    result
-}
-
-fn hash_internal_node<H>(left: &Hash, right: &Hash, hasher: &mut H) -> Hash
-    where H: Digest
-{
-    let mut result = vec![0u8; hasher.output_bits() / 8];
-
-    hasher.reset();
-    hasher.input(&[INTERNAL_SIG]);
-    hasher.input(left.as_slice());
-    hasher.input(right.as_slice());
+    if let Some(r) = right {
+        hasher.input(r.as_slice());
+    } else {
+        // if there is no right node, we hash left with itself
+        hasher.input(left.as_slice());
+    }
     hasher.result(result.as_mut_slice());
 
     result
@@ -164,10 +154,10 @@ fn build_upper_level<H>(nodes: &[Hash], hasher: &mut H) -> Vec<Hash>
     let mut i = 0;
     while i < nodes.len() {
         if i+1 < nodes.len() {
-            row.push(hash_internal_node(&nodes[i], &nodes[i+1], hasher));
+            row.push(hash_internal_node(&nodes[i], Some(&nodes[i+1]), hasher));
             i += 2;
         } else {
-            row.push(hash_internal_node_with_one_child(&nodes[i], hasher));
+            row.push(hash_internal_node(&nodes[i], None, hasher));
             i += 1;
         }
     }
@@ -203,7 +193,6 @@ fn build_internal_nodes<H>(nodes: &mut Vec<Hash>, count_internal_nodes: usize, h
 fn calculate_internal_nodes_count(count_leaves: usize) -> usize {
     utils::next_power_of_2(count_leaves) - 1
 }
-
 
 fn _build_from_leaves_with_hasher<H>(leaves: &[Hash], mut hasher: H) -> MerkleTree<H>
     where H: Digest
@@ -320,7 +309,7 @@ impl<H> MerkleTree<H>
     ///     assert_eq!(t1.root_hash(), t2.root_hash());
     /// }
     /// ```
-    pub fn build_from_leaves_with_hasher(leaves: &[Hash], mut hasher: H) -> MerkleTree<H>
+    pub fn build_from_leaves_with_hasher(leaves: &[Hash], hasher: H) -> MerkleTree<H>
         where H: Digest
     {
         let count_leaves = leaves.len();
