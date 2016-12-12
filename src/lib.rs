@@ -116,7 +116,8 @@ pub struct MerkleTree<H = DefaultHasher> {
 }
 
 fn hash_leaf<T, H>(value: &T, hasher: &mut H) -> Hash
-    where T: AsBytes, H: Digest
+    where T: AsBytes,
+          H: Digest
 {
     let mut result = vec![0u8; hasher.output_bits() / 8];
 
@@ -153,8 +154,8 @@ fn build_upper_level<H>(nodes: &[Hash], hasher: &mut H) -> Vec<Hash>
     let mut row = Vec::with_capacity((nodes.len() + 1) / 2);
     let mut i = 0;
     while i < nodes.len() {
-        if i+1 < nodes.len() {
-            row.push(hash_internal_node(&nodes[i], Some(&nodes[i+1]), hasher));
+        if i + 1 < nodes.len() {
+            row.push(hash_internal_node(&nodes[i], Some(&nodes[i + 1]), hasher));
             i += 2;
         } else {
             row.push(hash_internal_node(&nodes[i], None, hasher));
@@ -214,8 +215,7 @@ fn _build_from_leaves_with_hasher<H>(leaves: &[Hash], mut hasher: H) -> MerkleTr
     }
 }
 
-impl<H> MerkleTree<H>
-{
+impl<H> MerkleTree<H> {
     /// Constructs a tree from values of data. Data could be anything as long as it could be
     /// represented as bytes array.
     ///
@@ -228,7 +228,8 @@ impl<H> MerkleTree<H>
     /// let _t: MerkleTree = MerkleTree::build(&[block, block]);
     /// ```
     pub fn build<T>(values: &[T]) -> MerkleTree<H>
-        where H: Digest + Default, T: AsBytes
+        where H: Digest + Default,
+              T: AsBytes
     {
         let hasher = Default::default();
         MerkleTree::build_with_hasher(values, hasher)
@@ -255,10 +256,12 @@ impl<H> MerkleTree<H>
     /// }
     /// ```
     pub fn build_with_hasher<T>(values: &[T], mut hasher: H) -> MerkleTree<H>
-        where H: Digest, T: AsBytes
+        where H: Digest,
+              T: AsBytes
     {
         let count_leaves = values.len();
-        assert!(count_leaves > 1, format!("expected more then 1 value, received {}", count_leaves));
+        assert!(count_leaves > 1,
+                format!("expected more then 1 value, received {}", count_leaves));
 
         let leaves: Vec<Hash> = values.iter().map(|v| hash_leaf(v, &mut hasher)).collect();
 
@@ -313,7 +316,8 @@ impl<H> MerkleTree<H>
         where H: Digest
     {
         let count_leaves = leaves.len();
-        assert!(count_leaves > 1, format!("expected more then 1 leaf, received {}", count_leaves));
+        assert!(count_leaves > 1,
+                format!("expected more then 1 leaf, received {}", count_leaves));
 
         _build_from_leaves_with_hasher(leaves, hasher)
     }
@@ -383,12 +387,14 @@ impl<H> MerkleTree<H>
     /// assert!(!t.verify(0, &block2));
     /// ```
     pub fn verify<T>(&mut self, position: usize, value: &T) -> bool
-        where H: Digest, T: AsBytes
+        where H: Digest,
+              T: AsBytes
     {
-        assert!(position < self.count_leaves, "position does not relate to any leaf");
+        assert!(position < self.count_leaves,
+                "position does not relate to any leaf");
 
         self.nodes[self.count_internal_nodes + position].as_slice() ==
-            hash_leaf(value, &mut self.hasher).as_slice()
+        hash_leaf(value, &mut self.hasher).as_slice()
     }
 }
 
@@ -501,7 +507,8 @@ mod tests {
         let block = "Hello World";
         let t: MerkleTree = MerkleTree::build(&[block, block]);
 
-        assert_eq!("c9978dc3e2d729207ca4c012de993423f19e7bf02161f7f95cdbf28d1b57b88a", t.root_hash_str());
+        assert_eq!("c9978dc3e2d729207ca4c012de993423f19e7bf02161f7f95cdbf28d1b57b88a",
+                   t.root_hash_str());
     }
 
     #[test]

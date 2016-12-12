@@ -3,9 +3,9 @@
 extern crate test;
 
 use self::test::Bencher;
-use super::MerkleTree;
 
 use std::iter;
+use super::MerkleTree;
 
 #[bench]
 fn build(b: &mut Bencher) {
@@ -14,6 +14,8 @@ fn build(b: &mut Bencher) {
 
     b.iter(|| {
         let n = test::black_box(100);
-        for _i in 0..n { let _t: MerkleTree = MerkleTree::build(blocks.as_slice()); }
+        for _i in 0..n {
+            let _t: MerkleTree = MerkleTree::build(blocks.as_slice());
+        }
     });
 }
