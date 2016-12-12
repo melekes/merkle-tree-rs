@@ -182,7 +182,7 @@ fn build_internal_nodes<H>(nodes: &mut Vec<Hash>, count_internal_nodes: usize, h
     while parents.len() > 1 {
         parents = build_upper_level(parents.as_slice(), hasher);
 
-        upper_level_start -= parents.len() - 1;
+        upper_level_start -= parents.len();
         upper_level_end = upper_level_start + parents.len();
         nodes[upper_level_start..upper_level_end].clone_from_slice(&parents);
     }
@@ -500,8 +500,25 @@ mod tests {
     fn test_root_hash_stays_the_same_if_data_hasnt_been_changed() {
         let block = "Hello World";
         let t: MerkleTree = MerkleTree::build(&[block, block]);
-        // root hash should stay the same if data hasn't been changed
+
         assert_eq!("c9978dc3e2d729207ca4c012de993423f19e7bf02161f7f95cdbf28d1b57b88a", t.root_hash_str());
+    }
+
+    #[test]
+    fn test_root_children_have_the_same_hash_if_blocks_were_the_same() {
+        let block = "Hello World";
+        let t: MerkleTree = MerkleTree::build(&[block, block, block, block, block]);
+
+        assert_eq!(t.nodes[1].as_slice(), t.nodes[2].as_slice());
+    }
+
+    #[test]
+    fn test_root_children_have_the_different_hash_if_blocks_were_the_different() {
+        let block1 = "Hello World";
+        let block2 = "Bye Bye";
+        let t: MerkleTree = MerkleTree::build(&[block1, block1, block2, block2]);
+
+        assert_ne!(t.nodes[1].as_slice(), t.nodes[2].as_slice());
     }
 
     #[test]
