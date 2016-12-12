@@ -185,6 +185,9 @@ struct MerkleTree {
 2. В методе `build_upper_level` складывать новые узлы не в новый массив, а в
    `nodes` (in-place).
 3. Разобраться с "rust cannot infer type for _" (`let _t: MerkleTree`).
+4. Сериализация/десериализация отдельным модулем
+5. Удобный интерфейс для пушетествия по дереву (`root().left().right()`) -
+   Builder pattern.
 
 ## Development
 
