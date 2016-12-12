@@ -79,7 +79,8 @@ t.leaves();
 Если они "сходятся" к root hash, то считаем их подлинными.
 
 ```
-assert!(t.verify_leaves(&leaves));
+let t: MerkleTree = MerkleTree::build_from_leaves(&leaves);
+assert_eq!(secure_copy_of_root_hash, t.root_hash());
 ```
 
 Осталось лишь запустить копирование нашего файла и по получении очередного блока
@@ -181,6 +182,8 @@ struct MerkleTree {
 **Возможные улучшения**
 
 1. Предоставить реализации AsBytes для большего кол-ва типов.
+2. В методе `build_upper_level` складывать новые узлы не в новый массив, а в
+   `nodes` (in-place).
 
 ## Development
 
