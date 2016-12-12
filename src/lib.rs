@@ -14,6 +14,7 @@
 extern crate crypto;
 extern crate rustc_serialize;
 
+mod bench;
 mod utils;
 
 use crypto::digest::Digest;

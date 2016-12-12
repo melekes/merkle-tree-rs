@@ -206,3 +206,10 @@ $ make run_shell
 $ cargo build --features "dev"
 $ cargo test
 ```
+
+### Step 3. Benchmark
+
+```
+$ cargo bench --features "dev"
+```
+
