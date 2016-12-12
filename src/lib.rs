@@ -489,27 +489,45 @@ mod test_tree {
 
     #[test]
     #[should_panic]
-    fn test_0_values() {
+    fn test_build_with_0_values() {
         let _t: MerkleTree = MerkleTree::build::<String>(&[]);
     }
 
     #[test]
-    fn test_odd_number_of_values() {
+    fn test_build_with_odd_number_of_values() {
         let block = "Hello World";
         let _t: MerkleTree = MerkleTree::build(&[block, block, block]);
     }
 
     #[test]
-    fn test_even_number_of_values() {
+    fn test_build_with_even_number_of_values() {
         let block = "Hello World";
         let _t: MerkleTree = MerkleTree::build(&[block, block, block, block]);
     }
 
     #[test]
-    fn test_hash_stays_the_same_if_data_hasnt_been_changed() {
+    fn test_root_hash_stays_the_same_if_data_hasnt_been_changed() {
         let block = "Hello World";
         let t: MerkleTree = MerkleTree::build(&[block, block]);
         // root hash should stay the same if data hasn't been changed
         assert_eq!("c9978dc3e2d729207ca4c012de993423f19e7bf02161f7f95cdbf28d1b57b88a", t.root_hash_str());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_build_from_leaves_with_0_values() {
+        let _t: MerkleTree = MerkleTree::build_from_leaves(&[]);
+    }
+
+    #[test]
+    fn test_building_a_tree_from_existing_tree() {
+        let block = "Hello World";
+        let existing_tree: MerkleTree = MerkleTree::build(&[block, block]);
+
+        let new_tree: MerkleTree = MerkleTree::build_from_leaves(existing_tree.leaves());
+
+        assert_eq!(new_tree.root_hash_str(), existing_tree.root_hash_str());
+        assert_eq!(new_tree.leaves().len(), existing_tree.leaves().len());
+        assert_eq!(new_tree.leaves(), existing_tree.leaves());
     }
 }
