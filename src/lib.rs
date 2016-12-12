@@ -30,11 +30,12 @@ type Hash = Vec<u8>;
 /// Merkle Tree is a binary tree, which nodes values are the hash of the
 /// concatenated values of their descendants hashes.
 ///
-/// Main article: https://en.wikipedia.org/wiki/Merkle_tree
+/// [Main article on Wikipedia](https://en.wikipedia.org/wiki/Merkle_tree)
 ///
 /// # Storage Format
 ///
-/// A binary tree is stored in a vector in breadth-first order. That is, starting with the root we go from left to right at every level.
+/// A binary tree is stored in a vector in breadth-first order. That is,
+/// starting with the root we go from left to right at every level.
 ///
 /// ```text
 ///     1
@@ -70,9 +71,10 @@ type Hash = Vec<u8>;
 /// let t: MerkleTree = MerkleTree::build(&blocks);
 /// ```
 ///
-/// block could be anything, as long as it implements `AsBytes` trait. In order
-/// to encode the numbers, you can use https://github.com/BurntSushi/byteorder
-/// library. If the block is an array of bytes, you don't have to do anything.
+/// block could be anything, as long as it implements [`AsBytes`] trait. In
+/// order to encode the numbers, you can use [byteorder
+/// library](https://github.com/BurntSushi/byteorder). If the block is an array
+/// of bytes, you don't have to do anything.
 ///
 /// As we mentioned earlier, you can pass your hash function:
 ///
@@ -94,7 +96,7 @@ type Hash = Vec<u8>;
 /// t.leaves();
 /// ```
 ///
-/// If we verify that those leaves sum up to the root_hash, we can use them to
+/// If we verify that those leaves sum up to the `root_hash`, we can use them to
 /// verify the blocks. Blocks could be received and checked one by one.
 ///
 /// ```text
@@ -414,7 +416,7 @@ impl DefaultHasher {
     }
 }
 
-/// Implementation of the Default trait from std library
+/// Implementation of the `Default` trait from std library
 impl Default for DefaultHasher {
     /// Creates a new `DefaultHasher` using [`DefaultHasher::new`]. See
     /// [`DefaultHasher::new`] documentation for more information.
@@ -425,7 +427,7 @@ impl Default for DefaultHasher {
     }
 }
 
-/// Implementation of the Digest trait from crypto library for our DefaultHasher
+/// Implementation of the `Digest` trait from crypto library for our [`DefaultHasher`]
 impl Digest for DefaultHasher {
     #[inline]
     fn input(&mut self, d: &[u8]) {
@@ -460,8 +462,8 @@ impl fmt::Debug for DefaultHasher {
     }
 }
 
-/// `AsBytes` is implemeted for types which are given as values to
-/// `MerkleTree::build` method.
+/// [`AsBytes`] is implemeted for types which are given as values to
+/// [`MerkleTree::build`] method.
 pub trait AsBytes {
     /// Converts value into the byte slice.
     fn as_bytes(&self) -> &[u8];
