@@ -81,7 +81,7 @@ type Hash = Vec<u8>;
 /// ```text
 /// use merkle_tree::MerkleTree;
 ///
-/// let t: MerkleTree = MerkleTree::build(&blocks, MyAwesomeHasher::new());
+/// let t: MerkleTree = MerkleTree::build_with_hasher(&blocks, MyAwesomeHasher::new());
 /// ```
 ///
 /// Then you somehow make a secure copy of the root hash.

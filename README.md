@@ -60,7 +60,7 @@ https://github.com/BurntSushi/byteorder . Если это уже массив б
 ```
 use merkle_tree::MerkleTree;
 
-let t: MerkleTree = MerkleTree::build(&blocks, MyAwesomeHasher::new());
+let t: MerkleTree = MerkleTree::build_with_hasher(&blocks, MyAwesomeHasher::new());
 ```
 
 Дальше вы каким-то магическим образом безопасно копируете root hash.
