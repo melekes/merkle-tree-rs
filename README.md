@@ -1,18 +1,18 @@
 # Merkle Tree implemented in Rust programming language
 
-*Спойлер: это одна из версий того, как может быть реализовано дерево Меркла.
-Конкретные реализации служат различным задачам и поэтому могут сильно
-различаться в деталях.*
+*Spoiler: this is one of the variations of Merkle tree. Concrete
+implementations serve different objectives and therefore can greatly differ in
+detail.*
 
-Дерево Меркла - дерево, у которого в узле находится хэш, полученный путем
-соединения хэшей дочерних элементов.
+Merkle Tree is a binary tree, which nodes values are the hash of the
+concatenated values of their descendants hashes.
 
-Основная статья: https://en.wikipedia.org/wiki/Merkle_tree
+Main article: https://en.wikipedia.org/wiki/Merkle_tree
 
-### Формат хранения
+### Storage format
 
-Бинарное дерево располагается в векторе в порядке breadth-first. Начиная с
-корневого узла идем слева направо на каждом уровне.
+A binary tree is stored in a vector in breadth-first order. That is, starting
+with the root we go from left to right at every level.
 
 ```
     1
@@ -20,29 +20,27 @@
  4 5 6 7
 ```
 
-Массив:
+Vector:
 
 ```
 [1 2 3 4 5 6 7]
 ```
 
-При формировании дерева, если на промежуточных уровнях нечетное количество
-узлов, то последний узел дублируется. Иначе, дерево будет не полным (complete
-binary tree). Условие полноты необходимо для описанной выше схемы хранения "2i
-2i+1".
+While building a tree, if there is an odd number of nodes at the given level,
+the last node will be duplicated. Otherwise, the tree won't be complete. And we
+need it to be complete in order to "2i 2i+1" schema to work.
 
-### Защита от потенциальных атак
+### Defence against potential attacks
 
-Чтобы защититься от атаки нахождения второго прообраза, в момент вычисления хэша
-к узлу добавляется: 0x00 - если он на нижнем уровне, 0x01 - если промежуточный или
-корневой.
+To defend against the second-preimage attack, when we calculate the hash we
+prepend data with 0x00 - for leaves, 0x01 - for internal nodes.
 
-По умолчанию для хэширования используется SHA256. Но можно передать свою
-реализацию (например, double SHA256).
+By default, we use SHA256. But you can pass your hash function (for example,
+double SHA256).
 
-## Использование
+## Usage
 
-Допустим у вас есть файл. Вы разбиваете его на 100 кусков и строите дерево.
+Let's say you have a file. You split it into 100 blocks and build a tree.
 
 ```rust
 use merkle_tree::MerkleTree;
@@ -50,12 +48,12 @@ use merkle_tree::MerkleTree;
 let t: MerkleTree = MerkleTree::build(&blocks);
 ```
 
-В качестве блока может быть что угодно, до тех пор пока оно реализует trait
-`AsBytes`. Для кодирования чисел есть библиотека
-https://github.com/BurntSushi/byteorder . Если это уже массив байтов, ничего
-делать не требуется.
+block could be anything, as long as it implements [`AsBytes`] trait. In order
+to encode the numbers, you can use [byteorder
+library](https://github.com/BurntSushi/byteorder). If the block is an array of
+bytes, you don't have to do anything.
 
-Как уже упоминалось выше, можно передать свою хэш-функцию:
+As we mentioned earlier, you can pass your hash function:
 
 ```
 use merkle_tree::MerkleTree;
@@ -63,34 +61,29 @@ use merkle_tree::MerkleTree;
 let t: MerkleTree = MerkleTree::build_with_hasher(&blocks, MyAwesomeHasher::new());
 ```
 
-Дальше вы каким-то магическим образом безопасно копируете root hash.
+Then you somehow make a secure copy of the root hash.
 
 ```
 t.root_hash();
 ```
 
-После этого можно скопировать элементы нижнего уровня (небезопасно, из любого
-источника).
+You can now copy leaves from any source.
 
 ```
 t.leaves();
 ```
 
-Если они "сходятся" к root hash, то считаем их подлинными.
+If we verify that those leaves sum up to the `root_hash`, we can use them to
+verify the blocks. Blocks could be received and checked one by one.
 
 ```
 let t: MerkleTree = MerkleTree::build_from_leaves(&leaves);
 assert_eq!(secure_copy_of_root_hash, t.root_hash());
-```
 
-Осталось лишь запустить копирование нашего файла и по получении очередного блока
-выполнять проверку:
-
-```
 assert!(t.verify(block_index, &block));
 ```
 
-где `block_index` - индекс блока (начиная с 0).
+where `block_index` - index of a block (starts at 0).
 
 ## Decision log
 
