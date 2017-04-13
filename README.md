@@ -87,22 +87,22 @@ where `block_index` - index of a block (starts at 0).
 
 ## Decision log
 
-### Почему бинарное дерево?
+### Why binary tree?
 
-Ни в одном источнике не говориться, сколько дочерних узлов должно быть у предка.
-Обычно выбирают 2. Получается, нам нужно знать только хэш соседнего узла, чтобы
-проверить поддерево. И так вплоть до корневого узла. На каждом уровне нам нужен
-лишь сосед справа (или слева). Это конечно, если нам требуется проверять log(N)
-хэшей на пути к корню.
+None of the sources say anything about the number of children each node could
+have. The usual choice is 2. So, we need to know only the hash of our neighbor
+to check the subtree. We go all the way up to the root node. At each level, we
+only need to know the hash of our neighbor to the right (or left). This is of
+course if you want to check log(N) hashes on a path to root.
 
 ```
     1
   2   3
 ```
 
-### Почему дерево упаковано в массив?
+### Why tree is stored in a vector?
 
-Я пробовал разные решения. В конце первого дня у меня было стандартное бинарное дерево (tag: 0.1.0).
+I've tried different solutions. At the end of the first day I had a standard binary tree (tag: 0.1.0).
 
 ```
 struct Node
@@ -113,7 +113,7 @@ struct Node
 }
 ```
 
-Потом добавил к нему массив ссылок на нижние элементы (используя Rc).
+Then I added an array of references to the lower elements to it (using Rc).
 
 ```
 struct Node
@@ -129,58 +129,58 @@ struct MerkleTree {
 }
 ```
 
-Главное преимущество такого дерева - возможность выкачивать ветви и
-проверять их в отсутствии полного дерева. НО тут я столкнулся с
-противоречием в статье на Wikipedia: мы можем выкачивать ветви, но мы не
-доверяем дереву пока оно не сходится к root hash. Что же получается? Мы
-выкачиваем ветви и надеемся на лучшее?
+The main advantage of such tree is the ability to get the branches and check
+them in the absence of a full tree. BUT then I was faced with a contradiction
+in the article on Wikipedia: we can get the branches, but we don't trust the
+tree until it converges to the root hash. So what we should do? Get the
+branches and hope for the best?
 
-Не знаю что сказать. Мне оно не нравилось и оно было излишне сложным.
-Конечно, я посмотрел другие реализации, но все они были либо чересчур
-абстрактными (не решали никакую проблему, не имели явного API), либо были
-написаны неудачно.
+Don't know what to say. I didn't like it. It was unnecessarily complicated. Of
+course, I looked at other implementations, but they were all either too
+abstract (was not solving any problem, had no clear API), or was written
+poorly.
 
-Единственная понравившаяся версия была на C++
-(https://codetrips.com/2016/06/19/implementing-a-merkle-tree-in-c/). На нее я
-наткнулся в конце второго дня. Но и она не была без недостатков. Я не говорю о
-shared_ptr на данные (указатель на данные в дереве; в Rust такое можно сделать
-только через raw_pointers). Я говорю о том, что неясно как верифицируется
-дерево на другой стороне (когда мы его скопировали для проверки данных). Ведь
-там указателей не будет! Да и блоки данных мы получаем не все сразу.
+The only suitable version was in C++
+(https://codetrips.com/2016/06/19/implementing-a-merkle-tree-in-c/). I found at
+the end of the second day. But it was not without flaws. I'm not talking about
+a shared_ptr to the data (a pointer to the data in the tree; in Rust this could
+be done only using raw_pointers). It is unclear how to verify the tree on the
+other side (when we have it copied for data validation). After all, there will
+be no pointers! And we do not receive all the blocks at once.
 
-Я не сразу пришел к последней версии. Довольно много пришлось подумать и
-поэкспериментировать. Возможно, стоило продумать все моменты до реализации.
-Но тогда я бы не узнал столько о Rust.
+I did not immediately come to the latest version. Pretty much had to think, and
+experiment. Maybe I should consider all aspects before implementing. But then I
+wouldn't have learned so much about Rust.
 
-**Плюсы конечной реализации**
+**Advantages of the final implementation**
 
-1. Легкость обхода дерева
-2. Отсуствие указателей в обе стороны (parent <-> child)
-3. Легкость сериализации - это же просто массив
+1. The ease of tree traversal
+2. The absence of pointers in both directions (parent <-> child)
+3. Ease of serialization - it's just an array
 
-(1) Чтобы достать родителя элемента, нужно лишь разделить индекс текущего узла
-пополам: `5 / 2 = 2`. Индекс левого дочернего узла - `2i`, правого - `2i+1`.
-Получаем легкость обхода дерева как от корня к дочерним элементам, так и от
-узлов нижнего уровня к корню.
+(1) to get the parent element, you need to divide the index of the current node
+in half: `5 / 2 = 2`. That's it! The index of the left child - `2i`, right
+child - `2i+1`. This way we get the ease of traversing the tree from root to
+children and vice-versa (from children to root).
 
-(3) Чтобы достать все узлы нижнего уровня, мы просто достаем `count_leaves`
-последних элементов.
+(3) to get all the leaves, we just need to get `count_leaves` last elements of
+the array.
 
-**Минусы конечной реализации**
+**Cons of the final implementation**
 
-1. Математика (2i, 2i+1) все же посложнее простого следования по указателям
-   (`e.left...`).
-2. Дерево должно быть полным (кроме последнего уровня), чтобы математика
-   работала. Порой приходится добавлять копии элементов.
+1. Mathematics (2i, 2i+1) is still more complicated comparing to following the
+   pointers: `e.left.right`.
+2. The tree should be complete (except for the last level) for math to work.
+   Sometimes we have to add duplicates.
 
-**Возможные улучшения**
+**Possible improvements**
 
-1. Предоставить реализации AsBytes для большего кол-ва типов.
-2. В методе `build_upper_level` складывать новые узлы не в новый массив, а в
-   `nodes` (in-place).
-3. Разобраться с "rust cannot infer type for _" (`let _t: MerkleTree`).
-4. Сериализация/десериализация отдельным модулем
-5. Удобный интерфейс для пушетествия по дереву (`root().left().right()`) -
+1. Provide implementations for `AsBytes` for a greater number of types.
+2. In `build_upper_level` put nodes into the `nodes` (in-place) without
+   creating intermediate arrays.
+3. Deal with "rust cannot infer type for _" (`let _t: MerkleTree`).
+4. Serialization/deserialization in a separate module.
+5. User-friendly interface for traversing a tree (`root().left().right()`) -
    Builder pattern.
 
 ## Development
